@@ -1,0 +1,12 @@
+image:
+    name: airflow-instance-operator
+    tag: latest
+
+airflow_image:
+    repository: airflow-base
+    tag: latest
+
+priorityClassName: "system-cluster-critical"
+
+podSecurityContext:
+  fsGroup: 2000

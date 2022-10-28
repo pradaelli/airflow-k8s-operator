@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-instance-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: airflow-instance-operator
+  template:
+    metadata:
+      labels:
+        name: airflow-instance-operator
+    spec:
+      serviceAccountName: airflow-instance-operator
+      {{- if .Values.priorityClassName }}
+      priorityClassName: "{{ .Values.priorityClassName }}"
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: airflow-instance-operator
+          image: {{ .Values.image.name }}:{{ .Values.image.tag }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: WATCH_NAMESPACE
+              value: ""
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: "airflow-instance-operator"
+            - name: AIRFLOW_DOCKER_TAG
+              value: {{ .Values.airflow_image.tag }}
+            - name: AIRFLOW_DOCKER_REPOSITORY
+              value: {{ .Values.airflow_image.repository }}

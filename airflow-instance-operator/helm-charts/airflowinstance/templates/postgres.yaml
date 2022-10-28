@@ -1,0 +1,21 @@
+apiVersion: acid.zalan.do/v1
+kind: postgresql
+metadata:
+  name: postgres-{{ include "airflow.fullname" . }}
+  labels:
+    {{- include "airflow.labels" . | nindent 4 }}
+spec:
+  databases:
+    {{ .Values.postgres.database.name }}: {{ .Values.postgres.database.user }}
+  numberOfInstances: {{ .Values.postgres.instance }}
+  postgresql:
+    version: "11"
+  teamId: postgres
+  users:
+    {{ .Values.postgres.database.user }}:
+    - superuser
+    - createdb
+  volume:
+    size: {{ .Values.postgres.volume.size}}
+  resources:
+    {{- toYaml .Values.postgres.resources | nindent 4 }}

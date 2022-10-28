@@ -1,0 +1,31 @@
+apiVersion: metapipes.eda.nike.com/v1alpha1
+kind: AirflowInstance
+metadata:
+  name: example-airflowinstance
+  # namespace: example-airflowteam
+spec:
+  # Default values copied from airflow-instance-operator/helm-charts/airflowinstance/values.yaml
+
+  # Default values for airflowinstance.
+  # This is a YAML-formatted file.
+  # Declare variables to be passed into your templates.
+  iamRole: "k8s-eks-sbx01-example-airflowteam"
+  airflowVariables: |
+    {
+      "kube_spark_api_uri": "http://kube-spark-api.spark-operator:5000"
+    }
+
+  local:
+    enabled: True
+    dags_location: /tmp/airflow/test
+    scripts_location: /tmp/airflow/scripts
+    logs_location: /tmp/airflow/logs
+    nodeport: 30078
+  image:
+    pullPolicy: IfNotPresent
+  ldap:
+    enabled: False
+    # bind_user: "" #fetch from secret??
+    # bind_password: "" #fetch from secret??
+    # superuser_filter: ""
+    # data_profiler_user: ""

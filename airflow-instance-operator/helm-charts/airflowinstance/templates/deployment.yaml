@@ -1,0 +1,225 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "airflow.fullname" . }}
+  labels:
+    {{- include "airflow.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "airflow.selectorLabels" . | nindent 6 }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/airflow-configmap.yaml") . | sha256sum }}
+        checksum/serviceaccount: {{ include (print $.Template.BasePath "/serviceaccount.yaml") . | sha256sum }}
+{{- if not .Values.oidcEnabled }}
+        iam.amazonaws.com/role: {{ .Values.iamRole }}
+{{- end }}
+      labels:
+        {{- include "airflow.selectorLabels" . | nindent 8 }}
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      serviceAccountName: {{ include "airflow.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: web
+          command:
+          - /bin/sh
+          args:
+            - -c
+            - airflow webserver
+          env:
+          - name: FERNET_KEY
+            valueFrom:
+              secretKeyRef:
+                key: fernet_key
+                name: {{ include "airflow.fullname" . }}
+          - name: SQL_ALCHEMY_CONN
+            valueFrom:
+              secretKeyRef:
+                key: sql_alchemy_conn
+                name: {{ include "airflow.fullname" . }}
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "AIRFLOW_DOCKER_TAG" }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+          - mountPath: /opt/airflow/airflow.cfg
+            name: airflow-config
+            subPath: airflow.cfg
+          - mountPath: /opt/airflow/variables.json
+            name: airflow-config
+            subPath: variables.json
+          - mountPath: /opt/airflow/dags
+            name: dags
+          - mountPath: /opt/airflow/logs
+            name: logs
+          - mountPath: /opt/airflow/scripts
+            name: scripts
+        - name: scheduler
+          command:
+          - /bin/sh
+          args:
+            - -c
+            - airflow scheduler
+          env:
+          - name: FERNET_KEY
+            valueFrom:
+              secretKeyRef:
+                key: fernet_key
+                name: {{ include "airflow.fullname" . }}
+          - name: SQL_ALCHEMY_CONN
+            valueFrom:
+              secretKeyRef:
+                key: sql_alchemy_conn
+                name: {{ include "airflow.fullname" . }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "AIRFLOW_DOCKER_TAG" }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 14 }}
+          volumeMounts:
+          - mountPath: /opt/airflow/airflow.cfg
+            name: airflow-config
+            subPath: airflow.cfg
+          - mountPath: /opt/airflow/variables.json
+            name: airflow-config
+            subPath: variables.json
+          - mountPath: /opt/airflow/dags
+            name: dags
+          - mountPath: /opt/airflow/logs
+            name: logs
+          - mountPath: /opt/airflow/scripts
+            name: scripts
+      initContainers:
+      - args:
+        - -c
+        - kubectl create secret generic {{ include "airflow.fullname" . }} --from-literal=sql_alchemy_conn=postgresql+psycopg2://$DB_USER:$DB_PASSWORD@$DB_HOST:5432/$DB_NAME --from-literal=fernet_key=$(dd if=/dev/urandom bs=32 count=1 2>/dev/null| openssl base64) || true
+        command:
+        - /bin/sh
+        env:
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              key: username
+              name: {{ .Values.postgres.database.name}}.postgres-{{ include "airflow.fullname" . }}.credentials.postgresql.acid.zalan.do
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: {{ .Values.postgres.database.name}}.postgres-{{ include "airflow.fullname" . }}.credentials.postgresql.acid.zalan.do
+        - name: DB_HOST
+          value:  postgres-{{ include "airflow.fullname" . }}
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_NAME
+          value: {{ .Values.postgres.database.name}}
+        image: bitnami/kubectl
+        imagePullPolicy: Always
+        name: init-secrets
+        resources:
+          requests:
+            cpu: 10m
+            memory: 100Mi
+      - args:
+        - -c
+        - /opt/airflow/init-airflow.sh
+        - airflow variables -i /opt/airflow/variables.json
+        command:
+        - /bin/sh
+        env:
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              key: username
+              name: {{ .Values.postgres.database.name}}.postgres-{{ include "airflow.fullname" . }}.credentials.postgresql.acid.zalan.do
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: {{ .Values.postgres.database.name}}.postgres-{{ include "airflow.fullname" . }}.credentials.postgresql.acid.zalan.do
+        - name: DB_HOST
+          value:  postgres-{{ include "airflow.fullname" . }}
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_NAME
+          value: {{ .Values.postgres.database.name}}
+        - name: FERNET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: fernet_key
+              name: {{ include "airflow.fullname" . }}
+        - name: SQL_ALCHEMY_CONN
+          valueFrom:
+            secretKeyRef:
+              key: sql_alchemy_conn
+              name: {{ include "airflow.fullname" . }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "AIRFLOW_DOCKER_TAG" }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        name: init
+        resources:
+          requests:
+            cpu: 10m
+            memory: 100Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /opt/airflow/airflow.cfg
+          name: airflow-config
+          subPath: airflow.cfg
+        - mountPath: /opt/airflow/variables.json
+          name: airflow-config
+          subPath: variables.json
+        - mountPath: /opt/airflow/dags
+          name: dags
+        - mountPath: /opt/airflow/logs
+          name: logs
+        - mountPath: /opt/airflow/scripts
+          name: scripts
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      volumes:
+        - name: airflow-config
+          configMap:
+            name: {{ include "airflow.fullname" . }}-config
+        - name: dags
+          persistentVolumeClaim:
+            claimName: {{ include "airflow.fullname" . }}-dags
+        - name: logs
+          persistentVolumeClaim:
+            claimName: {{ include "airflow.fullname" . }}-logs
+        - name: scripts
+          persistentVolumeClaim:
+            claimName: {{ include "airflow.fullname" . }}-scripts

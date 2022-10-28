@@ -1,0 +1,5 @@
+---
+- version: v1alpha1
+  group: metapipes.eda.nike.com
+  kind: AirflowInstance
+  chart: ./helm-charts/airflowinstance
