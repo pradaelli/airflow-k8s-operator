@@ -1,4 +1,4 @@
-apiVersion: metapipes.eda.nike.com/v1alpha1
+apiVersion: operator.example.com/v1alpha1
 kind: AirflowInstance
 metadata:
   name: example-airflowinstance

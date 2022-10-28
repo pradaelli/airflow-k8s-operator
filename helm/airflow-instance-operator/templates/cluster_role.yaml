@@ -65,7 +65,7 @@ rules:
   verbs:
   - get
 - apiGroups:
-  - metapipes.eda.nike.com
+  - operator.example.com
   resources:
   - '*'
   verbs:
