@@ -1,0 +1,30 @@
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ include "airflow.fullname" . }}
+  labels:
+    {{- include "airflow.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["*"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "delete"]
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ include "airflow.fullname" . }}-worker
+  labels:
+    {{- include "airflow.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log"]
+  verbs: ["*"]
+- apiGroups: ["sparkoperator.k8s.io"]
+  resources: ["sparkapplications"]
+  verbs: ["*"]
+- apiGroups: [""]
+  resources: ["serviceaccounts"]
+  verbs: ["get"]

@@ -1,0 +1,163 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "airflow.fullname" . }}-config
+  labels:
+    {{- include "airflow.labels" . | nindent 4 }}
+data:
+  variables.json: |
+{{ .Values.airflowVariables | indent 4 }}
+  airflow.cfg: |
+    [core]
+    dags_folder = /opt/airflow/dags
+    base_log_folder = /opt/airflow/logs
+    logging_level = INFO
+    log_format = [%%(asctime)s] %%(levelname)s - %%(message)s
+    executor = KubernetesExecutor
+    parallelism = 32
+    load_examples = False
+    plugins_folder = /opt/airflow/plugins
+    sql_alchemy_conn = $SQL_ALCHEMY_CONN
+    # custom
+    fernet_key = $FERNET_KEY
+    sql_alchemy_pool_size = 5
+    sql_alchemy_pool_recycle = 3600
+    dag_concurrency = 16
+    dags_are_paused_at_creation = True
+    non_pooled_task_slot_count = 128
+    max_active_runs_per_dag = 16
+    donot_pickle = False
+    dagbag_import_timeout = 30
+    default_impersonation =
+    security =
+    unit_test_mode = False
+
+    [scheduler]
+    dag_dir_list_interval = {{ .Values.dag_dir_list_interval }}
+    child_process_log_directory = /opt/airflow/logs/scheduler
+    job_heartbeat_sec = 5
+    max_threads = 2
+    scheduler_heartbeat_sec = 5
+    run_duration = -1
+    min_file_process_interval = 0
+    statsd_on = False
+    statsd_host = localhost
+    statsd_port = 8125
+    statsd_prefix = airflow
+    min_file_parsing_loop_time = 1
+    print_stats_interval = 30
+    scheduler_zombie_task_threshold = 300
+    max_tis_per_query = 0
+    authenticate = False
+    catchup_by_default = True
+
+    [webserver]
+    base_url = http://{{ .Values.hostName }}/airflow/{{.Release.Namespace}}/{{ include "airflow.fullname" . | replace "-airflowinstance" "" }}
+    web_server_host = 0.0.0.0
+    web_server_port = 8080
+    web_server_ssl_cert =
+    web_server_ssl_key =
+    web_server_master_timeout = 120
+    web_server_worker_timeout = 120
+    worker_refresh_batch_size = 1
+    worker_refresh_interval = 30
+    secret_key = temporary_key
+    workers = 2
+    worker_class = sync
+    access_logfile = -
+    error_logfile = -
+    expose_config = True
+    authenticate = {{ if .Values.ldap.enabled }} True {{ else }} False {{ end }}
+    auth_backend = airflow.contrib.auth.backends.ldap_auth
+    filter_by_owner = false
+    owner_mode = ldapgroup
+    dag_default_view = tree
+    dag_orientation = LR
+    demo_mode = false
+    log_fetch_timeout_sec = 5
+    hide_paused_dags_by_default = false
+    page_size = 100
+    rbac = False
+    enable_proxy_fix = True
+
+    [smtp]
+    smtp_host = smtp.com
+    smtp_starttls = True
+    smtp_ssl = False
+    smtp_port = 25
+    smtp_mail_from = some@email.com
+
+    [kubernetes]
+    airflow_configmap = {{ include "airflow.fullname" . }}-config
+    worker_container_repository = {{ .Values.image.repository }}
+    worker_container_tag = {{ .Values.image.tag | default "AIRFLOW_DOCKER_TAG" }}
+    worker_container_image_pull_policy = IfNotPresent
+    worker_service_account_name = {{ include "airflow.serviceAccountName" . }}-worker
+    delete_worker_pods = True
+    dags_volume_claim = {{ include "airflow.fullname" . }}-dags
+    dags_volume_subpath =
+    logs_volume_claim = {{ include "airflow.fullname" . }}-logs
+    logs_volume_subpath =
+    in_cluster = True
+    namespace = {{ .Release.Namespace }}
+    kube_client_request_args = {"_request_timeout": "120s"}
+
+    [kubernetes_annotations]
+    iam.amazonaws.com/role = {{ .Values.iamRole }}
+
+    [kubernetes_secrets]
+    SQL_ALCHEMY_CONN = {{ include "airflow.fullname" . }}=sql_alchemy_conn
+    FERNET_KEY = {{ include "airflow.fullname" . }}=fernet_key
+
+    [kubernetes_environment_variables]
+    POD_NAMESPACE = {{ .Release.Namespace }}
+
+    [cli]
+    api_client = airflow.api.client.json_client
+    endpoint_url = http://localhost:8080
+
+    [api]
+    auth_backend = airflow.api.auth.backend.default
+
+    [admin]
+    hide_sensitive_variable_fields = True
+
+    [operators]
+    default_owner = Airflow
+    default_cpus = 1
+    default_ram = 512
+    default_disk = 512
+    default_gpus = 0
+
+{{ if .Values.ldap.enabled }}
+    [ldap]
+    uri = ldaps://ldap.com:636
+    user_filter = {{ .Values.ldap.filter }}
+    user_name_attr = sAMAccountName
+    bind_user = {{ .Values.ldap.bind_user }}
+    bind_password = {{ .Values.ldap.bind_password }}
+    basedn = DC=ad,DC=somegroup,DC=com
+    superuser_filter = {{ .Values.ldap.superuser_filter }}
+    data_profiler_filter = {{ .Values.ldap.data_profiler_filter }}
+    # Note: the cacert file below doesn't even need to exist...
+    cacert = /etc/ca/ldap_ca.crt
+    search_scope = SUBTREE
+{{ end }}
+    [rest_api_plugin]
+
+    # Logs global variables used in the REST API plugin when the plugin is loaded. Set to False by default to avoid too many logging messages.
+    # DEFAULT: False
+    log_loading = False
+
+    # Filters out loading messages from the standard out
+    # DEFAULT: True
+    filter_loading_messages_in_cli_response = True
+
+    # HTTP Header Name to be used for authenticating REST calls for the REST API Plugin
+    # DEFAULT: 'rest_api_plugin_http_token'
+    rest_api_plugin_http_token_header_name = {{ .Values.restApiPlugin.TokenHeaderName }}
+
+    # HTTP Token  to be used for authenticating REST calls for the REST API Plugin
+    # DEFAULT: None
+    # Comment this out to disable Authentication
+    rest_api_plugin_expected_http_token = {{ .Values.restApiPlugin.Token }}

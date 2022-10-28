@@ -1,0 +1,19 @@
+{{ if .Capabilities.APIVersions.Has "monitoring.coreos.com/v1/ServiceMonitor" }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    {{- include "airflow.labels" . | nindent 4 }}
+  name: {{ include "airflow.fullname" . }}
+spec:
+  endpoints:
+  - interval: 5s
+    port: http
+    path: "airflow/{{ .Release.Namespace }}/{{ .Release.Name }}/admin/metrics"
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace }}
+  selector:
+    matchLabels:
+      {{- include "airflow.labels" . | nindent 6 }}
+{{ end }}

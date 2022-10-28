@@ -1,0 +1,6 @@
+apiVersion: v1
+appVersion: kubeexecutor
+description: A airflow Helm chart for Kubernetes
+name: airflowinstance
+type: application
+version: 0.0.1

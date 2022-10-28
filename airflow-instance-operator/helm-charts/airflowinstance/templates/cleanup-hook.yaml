@@ -1,0 +1,84 @@
+# Post delete job to cleanup orphaned postgresql secrets
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "airflow.fullname" . }}-cleanup
+  labels:
+    {{- include "airflow.labels" . | nindent 4 }}
+  annotations:
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    "helm.sh/hook": post-delete
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ include "airflow.fullname" . }}
+      labels:
+        {{- include "airflow.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "airflow.fullname" . }}-cleanup
+      containers:
+      - name: cleanup
+        image: bitnami/kubectl
+        command:
+        - /bin/sh
+        args:
+        - -c
+        - kubectl --namespace {{ .Release.Namespace }} delete secrets airflow.postgres-{{ include "airflow.fullname" . }}.credentials.postgresql.acid.zalan.do postgres.postgres-{{ include "airflow.fullname" . }}.credentials.postgresql.acid.zalan.do standby.postgres-{{ include "airflow.fullname" . }}.credentials.postgresql.acid.zalan.do {{ include "airflow.fullname" . }} || true
+        resources:
+          requests:
+            memory: "100Mi"
+            cpu: "10m"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "airflow.fullname" . }}-cleanup
+  labels:
+{{ include "airflow.labels" . | nindent 4 }}
+  annotations:
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    "helm.sh/hook": post-delete
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ include "airflow.fullname" . }}-cleanup
+  labels:
+    {{- include "airflow.labels" . | nindent 4 }}
+  annotations:
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    "helm.sh/hook": post-delete
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "airflow.fullname" . }}-cleanup
+  labels:
+    {{- include "airflow.labels" . | nindent 4 }}
+  annotations:
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    "helm.sh/hook": post-delete
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "airflow.fullname" . }}-cleanup
+subjects:
+- kind: ServiceAccount
+  name: {{ include "airflow.fullname" . }}-cleanup

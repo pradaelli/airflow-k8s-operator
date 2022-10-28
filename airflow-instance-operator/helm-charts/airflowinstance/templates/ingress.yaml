@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "airflow.fullname" . }}
+  labels:
+    {{- include "airflow.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+{{- if not .Values.local.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.hostName }}
+      secretName: {{ .Values.tlsSecret }}
+{{- end }}
+  rules:
+    - host: {{ .Values.hostName }}
+      http:
+        paths:
+          - path: /airflow/{{.Release.Namespace}}/{{ include "airflow.fullname" . | replace "-airflowinstance" "" }}
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ include "airflow.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}

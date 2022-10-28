@@ -1,0 +1,41 @@
+{{ if .Values.local.enabled }}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ include "airflow.fullname" . }}-scripts
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  volumeName: {{ .Release.Namespace }}-{{ include "airflow.fullname" . }}-scripts
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: {{ .Release.Namespace }}-{{ include "airflow.fullname" . }}-scripts
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: {{ .Values.local.scripts_location }}
+{{ else }}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ include "airflow.fullname" . }}-scripts
+  annotations:
+    volume.beta.kubernetes.io/storage-class: aws-efs
+spec:
+  storageClassName: aws-efs
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Mi
+{{ end }}
